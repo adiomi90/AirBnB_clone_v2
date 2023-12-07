@@ -1,75 +1,59 @@
 #!/usr/bin/python3
-import os.path
-from datetime import datetime
-from fabric.api import env
-from fabric.api import local
-from fabric.api import put
-from fabric.api import run
+""" A module that generates and distributes an archive to your web server """
+from fabric.api import put, run, local, env
+from time import strftime
+from os import path
 
-env.hosts = ['54.90.63.173', '52.91.134.31']
+
+env.hosts = ["54.90.63.173", "52.91.134.31"]
+env.user = "ubuntu"
+env.key_filename = "~/.ssh/school"
 
 
 def do_pack():
-    """Create a tar gzipped archive of the directory web_static."""
-    dt = datetime.utcnow()
-    file = "versions/web_static_{}{}{}{}{}{}.tgz".format(dt.year,
-                                                         dt.month,
-                                                         dt.day,
-                                                         dt.hour,
-                                                         dt.minute,
-                                                         dt.second)
-    if os.path.isdir("versions") is False:
-        if local("mkdir -p versions").failed is True:
-            return None
-    if local("tar -cvzf {} web_static".format(file)).failed is True:
+    """ A fabric function to generate the archive content """
+
+    timestamp = strftime("%Y%m%d%H%M%S")
+    try:
+        local("mkdir -p versions")
+        local("tar -czvf versions/web_static_{}.tgz web_static/"
+              .format(timestamp))
+
+        return "versions/web_static_{}.tgz".format(timestamp)
+
+    except Exception as err:
         return None
-    return file
 
 
 def do_deploy(archive_path):
-    """Distributes an archive to a web server.
+    """ A Fabric function to distribute the archive content"""
 
-    Args:
-        archive_path (str): The path of the archive to distribute.
-    Returns:
-        If the file doesn't exist at archive_path or an error occurs - False.
-        Otherwise - True.
-    """
-    if os.path.isfile(archive_path) is False:
+    if not path.exists(archive_path):
         return False
-    file = archive_path.split("/")[-1]
-    name = file.split(".")[0]
-
-    if put(archive_path, "/tmp/{}".format(file)).failed is True:
+    try:
+        arcfile = archive_path.split("/")[-1]
+        fname = arcfile.split(".")[0]
+        put(archive_path, '/tmp/')
+        run("mkdir -p /data/web_static/releases/{}/".format(fname))
+        run("tar -zxvf /tmp/{} -C /data/web_static/releases/{}/"
+            .format(arcfile, fname))
+        run("rm /tmp/{}".format(arcfile))
+        run("mv /data/web_static/releases/{}/web_static/*\
+            /data/web_static/releases/{}/".format(fname, fname))
+        run("rm -rf /data/web_static/releases/{}/web_static".format(fname))
+        run("rm -rf /data/web_static/current")
+        run("ln -s /data/web_static/releases/{}/ /data/web_static/current"
+            .format(fname))
+        return True
+    except Exception as err:
         return False
-    if run("rm -rf /data/web_static/releases/{}/".
-           format(name)).failed is True:
-        return False
-    if run("mkdir -p /data/web_static/releases/{}/".
-           format(name)).failed is True:
-        return False
-    if run("tar -xzf /tmp/{} -C /data/web_static/releases/{}/".
-           format(file, name)).failed is True:
-        return False
-    if run("rm /tmp/{}".format(file)).failed is True:
-        return False
-    if run("mv /data/web_static/releases/{}/web_static/* "
-           "/data/web_static/releases/{}/".format(name, name)).failed is True:
-        return False
-    if run("rm -rf /data/web_static/releases/{}/web_static".
-           format(name)).failed is True:
-        return False
-    if run("rm -rf /data/web_static/current").failed is True:
-        return False
-    if run("ln -s /data/web_static/releases/{}/ /data/web_static/current".
-           format(name)).failed is True:
-        return False
-    return True
 
 
 def deploy():
-    """Create and distribute an archive to a web server."""
-    file = do_pack()
-    if file is None:
+    """ runs the 2 fabric functions """
+
+    path = do_pack()
+    if not path:
         return False
-    return do_deploy(file)
+
+    return do_deploy(path)

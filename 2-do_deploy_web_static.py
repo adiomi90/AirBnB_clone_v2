@@ -1,33 +1,43 @@
 #!/usr/bin/python3
-""" A module that distributes an archive to your web server """
-from fabric.api import put, run, env
-from os import path
+"""Fabric script (based on the file 1-pack_web_static.py) that
+distributes an archive to your web servers, using the function
+do_deploy."""
+
+from datetime import datetime
+from fabric.api import *
+import shlex
+import os
 
 
-env.hosts = ["54.90.63.173", "52.91.134.31"]
+env.hosts = ['54.90.63.173', '52.91.134.31']
 env.user = "ubuntu"
-env.key_filename = "~/.ssh/school"
 
 
 def do_deploy(archive_path):
-    """ A Fabric function to distribute the archive content"""
-
-    if not path.exists(archive_path):
+    """ Deploys """
+    if not os.path.exists(archive_path):
         return False
     try:
-        arcfile = archive_path.split("/")[-1]
-        fname = arcfile.split(".")[0]
-        put(archive_path, '/tmp/')
-        run("mkdir -p /data/web_static/releases/{}/".format(fname))
-        run("tar -zxvf /tmp/{} -C /data/web_static/releases/{}/"
-            .format(arcfile, fname))
-        run("rm /tmp/{}".format(arcfile))
-        run("mv /data/web_static/releases/{}/web_static/*\
-            /data/web_static/releases/{}/".format(fname, fname))
-        run("rm -rf /data/web_static/releases/{}/web_static".format(fname))
+        name = archive_path.replace('/', ' ')
+        name = shlex.split(name)
+        name = name[-1]
+
+        wname = name.replace('.', ' ')
+        wname = shlex.split(wname)
+        wname = wname[0]
+
+        releases_path = "/data/web_static/releases/{}/".format(wname)
+        tmp_path = "/tmp/{}".format(name)
+
+        put(archive_path, "/tmp/")
+        run("mkdir -p {}".format(releases_path))
+        run("tar -xzf {} -C {}".format(tmp_path, releases_path))
+        run("rm {}".format(tmp_path))
+        run("mv {}web_static/* {}".format(releases_path, releases_path))
+        run("rm -rf {}web_static".format(releases_path))
         run("rm -rf /data/web_static/current")
-        run("ln -s /data/web_static/releases/{}/ /data/web_static/current"
-            .format(fname))
+        run("ln -s {} /data/web_static/current".format(releases_path))
+        print("New version deployed!")
         return True
-    except Exception as err:
+    except:
         return False

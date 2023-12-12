@@ -1,43 +1,39 @@
 #!/usr/bin/python3
-"""Fabric script (based on the file 1-pack_web_static.py) that
-distributes an archive to your web servers, using the function
-do_deploy."""
-
+"""script that deploy archive!"""
+from fabric.api import env, local, put, run
 from datetime import datetime
-from fabric.api import *
-import shlex
-import os
-
-
 env.hosts = ['54.90.63.173', '52.91.134.31']
-env.user = "ubuntu"
+env.user = 'ubuntu'
+
+
+def do_pack():
+    """function that generates tgz archive"""
+    try:
+        date = datetime.now().strftime("%Y%m%d%H%M%S")
+        file_name = "versions/web_static_{}.tgz".format(date)
+        local("mkdir -p versions")
+        local('tar -cvzf {} web_static'.format(file_name))
+        return file_name
+    except Exception as e:
+        return None
 
 
 def do_deploy(archive_path):
-    """ Deploys """
-    if not os.path.exists(archive_path):
-        return False
+    """function that distributes an archive to your web servers"""
     try:
-        name = archive_path.replace('/', ' ')
-        name = shlex.split(name)
-        name = name[-1]
-
-        wname = name.replace('.', ' ')
-        wname = shlex.split(wname)
-        wname = wname[0]
-
-        releases_path = "/data/web_static/releases/{}/".format(wname)
-        tmp_path = "/tmp/{}".format(name)
-
-        put(archive_path, "/tmp/")
-        run("mkdir -p {}".format(releases_path))
-        run("tar -xzf {} -C {}".format(tmp_path, releases_path))
-        run("rm {}".format(tmp_path))
-        run("mv {}web_static/* {}".format(releases_path, releases_path))
-        run("rm -rf {}web_static".format(releases_path))
-        run("rm -rf /data/web_static/current")
-        run("ln -s {} /data/web_static/current".format(releases_path))
-        print("New version deployed!")
+        filename = archive_path.split("/")[-1]
+        onlyname = filename.split(".")[0]
+        uncompress_path = "/data/web_static/releases/{}".format(onlyname)
+        put(archive_path, '/tmp/')
+        run('sudo mkdir -p {}/'.format(uncompress_path))
+        run('sudo tar -xzf /tmp/{} -C {}'.format(filename, uncompress_path))
+        run('sudo rm /tmp/{}'.format(filename))
+        run('sudo mv {0}/web_static/* {0}/'.format(uncompress_path))
+        run('sudo rm -rf {}/web_static'.format(uncompress_path))
+        run('sudo rm -rf /data/web_static/current')
+        run('sudo ln -s {}/ /data/web_static/current'.format(uncompress_path))
+        print('New version deployed!')
         return True
-    except:
+    except BaseException:
+        print('Do it again')
         return False

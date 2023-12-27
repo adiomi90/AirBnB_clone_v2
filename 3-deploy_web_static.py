@@ -57,3 +57,8 @@ def deploy():
         return False
 
     return do_deploy(path)
+
+if __name__ == "__main__":
+    """Call the deploy function here, to execute the codes.
+    """
+    deploy()

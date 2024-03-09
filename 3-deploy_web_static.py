@@ -5,7 +5,7 @@ from time import strftime
 from os import path
 
 
-env.hosts = ['54.236.41.149','34.207.154.174']
+env.hosts = ["54.236.41.149", "34.207.154.174"]
 env.user = "ubuntu"
 env.key_filename = "~/.ssh/school"
 
@@ -57,8 +57,3 @@ def deploy():
         return False
 
     return do_deploy(path)
-
-if __name__ == "__main__":
-    """Call the deploy function here, to execute the codes.
-    """
-    deploy()

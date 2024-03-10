@@ -1,59 +1,66 @@
 #!/usr/bin/python3
-""" A module that generates and distributes an archive to your web server """
-from fabric.api import put, run, local, env
-from time import strftime
-from os import path
+"""
+    Fabric script that creates and distributes an archive
+    on my web servers, using deploy function
+"""
+from fabric.api import *
+from fabric.operations import run, put, sudo, local
+from datetime import datetime
+import os
 
-
-env.hosts = ["54.236.41.149", "34.207.154.174"]
-env.user = "ubuntu"
-env.key_filename = "~/.ssh/school"
+env.hosts = ['54.236.41.149', '34.207.154.174']
+created_path = None
 
 
 def do_pack():
-    """ A fabric function to generate the archive content """
-
-    timestamp = strftime("%Y%m%d%H%M%S")
+    """
+        generates a .tgz archine from contents of web_static
+    """
+    time = datetime.utcnow().strftime('%Y%m%d%H%M%S')
+    file_name = "versions/web_static_{}.tgz".format(time)
     try:
-        local("mkdir -p versions")
-        local("tar -czvf versions/web_static_{}.tgz web_static/"
-              .format(timestamp))
-
-        return "versions/web_static_{}.tgz".format(timestamp)
-
-    except Exception as err:
+        local("mkdir -p ./versions")
+        local("tar --create --verbose -z --file={} ./web_static"
+              .format(file_name))
+        return file_name
+    except:
         return None
 
 
 def do_deploy(archive_path):
-    """ A Fabric function to distribute the archive content"""
-
-    if not path.exists(archive_path):
+    """
+        using fabric to distribute archive
+    """
+    if os.path.isfile(archive_path) is False:
         return False
     try:
-        arcfile = archive_path.split("/")[-1]
-        fname = arcfile.split(".")[0]
-        put(archive_path, '/tmp/')
-        run("mkdir -p /data/web_static/releases/{}/".format(fname))
-        run("tar -zxvf /tmp/{} -C /data/web_static/releases/{}/"
-            .format(arcfile, fname))
-        run("rm /tmp/{}".format(arcfile))
-        run("mv /data/web_static/releases/{}/web_static/*\
-            /data/web_static/releases/{}/".format(fname, fname))
-        run("rm -rf /data/web_static/releases/{}/web_static".format(fname))
+        archive = archive_path.split("/")[-1]
+        path = "/data/web_static/releases"
+        put("{}".format(archive_path), "/tmp/{}".format(archive))
+        folder = archive.split(".")
+        run("mkdir -p {}/{}/".format(path, folder[0]))
+        new_archive = '.'.join(folder)
+        run("tar -xzf /tmp/{} -C {}/{}/"
+            .format(new_archive, path, folder[0]))
+        run("rm /tmp/{}".format(archive))
+        run("mv {}/{}/web_static/* {}/{}/"
+            .format(path, folder[0], path, folder[0]))
+        run("rm -rf {}/{}/web_static".format(path, folder[0]))
         run("rm -rf /data/web_static/current")
-        run("ln -s /data/web_static/releases/{}/ /data/web_static/current"
-            .format(fname))
+        run("ln -sf {}/{} /data/web_static/current"
+            .format(path, folder[0]))
         return True
-    except Exception as err:
+    except:
         return False
 
 
 def deploy():
-    """ runs the 2 fabric functions """
-
-    path = do_pack()
-    if not path:
+    """
+        deploy function that creates/distributes an archive
+    """
+    global created_path
+    if created_path is None:
+        created_path = do_pack()
+    if created_path is None:
         return False
-
-    return do_deploy(path)
+    return do_deploy(created_path)
